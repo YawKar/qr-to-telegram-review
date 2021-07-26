@@ -11,25 +11,40 @@ def getConnectionAndCursor():
     return con, cur
 
 
-def isChatIdExists(chat_id: str):
+def isChatIdExists(chatId: str) -> bool:
     con, cur = getConnectionAndCursor()
     res = cur.execute(
-        f"SELECT * FROM ChatsStage WHERE chatId = {chat_id}").fetchall()
+        f"SELECT * FROM ChatsStage WHERE chatId = {chatId}").fetchall()
     cur.close(), con.close()
+    return bool(res)
 
 
-def setStage(chat_id: str, stage: str) -> None:
+def setStage(chatId: str, stage: str) -> None:
     con, cur = getConnectionAndCursor()
+    cur.execute(
+        f"UPDATE ChatsStage SET stage = {stage} WHERE chatId = {chatId}")
+    con.commit()
     cur.close(), con.close()
 
 
-def getStage(chat_id: str) -> str:
+def getStage(chatId: str) -> str:
     con, cur = getConnectionAndCursor()
+    res = cur.execute(
+        f"SELECT * FROM ChatsStage WHERE chatId = {chatId}").fetchone()
     cur.close(), con.close()
+    return res[1]
 
 
 def check() -> None:
     con, cur = getConnectionAndCursor()
     cur.execute('''CREATE TABLE IF NOT EXISTS ChatsStage
                    (chatId text, stage text)''')
+    con.commit()
+    cur.close(), con.close()
+
+
+def addChatId(chatId: str) -> None:
+    con, cur = getConnectionAndCursor()
+    cur.execute(f"INSERT INTO ChatsStage VALUES ({chatId}, '0')")
+    con.commit()
     cur.close(), con.close()
