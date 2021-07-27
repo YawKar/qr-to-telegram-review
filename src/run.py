@@ -1,7 +1,6 @@
 from telegramBot import telegramBot
 from configWorker import configWorker
 from databaseWorker import databaseWorker
-import telebot
 
 
 def main():

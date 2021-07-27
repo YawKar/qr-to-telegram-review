@@ -2,7 +2,10 @@ from configparser import ConfigParser
 import os.path
 
 
-def get_config() -> ConfigParser:
+def getConfig() -> ConfigParser:
+    '''
+    Возвращает объект ConfigParser из которого можно читать параметры.
+    '''
     config = ConfigParser()
     config.read(os.path.dirname(__file__) + "/../settings.ini")
     return config

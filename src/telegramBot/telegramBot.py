@@ -1,37 +1,69 @@
 import telebot
 from telebot.types import Message
-from configWorker.configWorker import get_config
+from configWorker.configWorker import getConfig
 import databaseWorker.databaseWorker as Dbw
 
 
 def main():
-    config = get_config()
+    config = getConfig()
     tBot = telebot.TeleBot(config.get("Telegram", "TOKEN"))
 
     @tBot.message_handler(commands=['start'])
     def start_handler(message: Message):
-        given_uid = message.text.strip("/start").strip()
+        reviewId = message.text.strip("/start").strip()
         chatId = str(message.chat.id)
-        if given_uid:
-            if Dbw.isChatIdExists(chatId) == False:
-                Dbw.addChatId(chatId)
-            Dbw.setStage(chatId, '1')
-            tBot.send_message(
-                message.chat.id, f"Здравствуйте, номер вашего отзыва: {given_uid}, напишите отзыв:")
+        if Dbw.isChatIdExists(chatId) == False:
+            Dbw.addChatId(chatId)
+        # пришли по ссылке ?start=reviewId или пришло сообщение вида "/start reviewId"
+        if reviewId:
+            # существует ли этот УИд товара в базе
+            if Dbw.isReviewIdExists(reviewId):
+                # состояние отзыва: уже написан или ожидает
+                reviewIdStage = Dbw.getReviewIdStage(reviewId)
+                # если статус ожидания
+                if reviewIdStage == "wait":
+                    Dbw.setChatIdStage(chatId, "waitForReview")
+                    Dbw.setChatIdReviewId(chatId, reviewId)
+                    tBot.send_message(
+                        chatId, f"Номер текущего билета: {reviewId}.\nПожалуйста, напишите и отправьте свой отзыв.")
+                # если отзыв уже был дан
+                elif reviewIdStage == "complete":
+                    tBot.send_message(
+                        chatId, f"Билет с номером {reviewId} уже обработан и недоступен!")
+            # этого УИд товара нет в базе
+            else:
+                tBot.send_message(
+                    chatId, f"Билета с номером {reviewId} не существует!")
+        # просто пришли в бота
         else:
             tBot.send_message(
-                message.chat.id, "Здравствуйте, это бот, собирающий отзывы")
+                chatId, "Здравствуйте, этот бот обрабатывает отзывы. Перейдите по ссылке в QR коде.")
 
     @tBot.message_handler()
     def text_handler(message: Message):
-        chatId = message.chat.id
-        text = message.text
-        if Dbw.isChatIdExists(chatId):
-            if Dbw.getStage(chatId) == '1':
-                Dbw.setStage(chatId, '2')
-                tBot.send_message(chatId, "Спасибо за ваш отзыв!")
-        else:
+        chatId = str(message.chat.id)
+        text = message.text.strip()
+        if Dbw.isChatIdExists(chatId) == False:
             Dbw.addChatId(chatId)
+        chatIdStage = Dbw.getChatIdStage(chatId)
+        # чат не закреплён за каким-то билетом
+        if chatIdStage == "idle":
             tBot.send_message(
-                chatId, "Здравствуйте, это бот, собирающий отзывы")
+                chatId, "Здравствуйте, этот бот обрабатывает отзывы. Перейдите по ссылке в QR коде.")
+        # ожидает написания отзыва
+        elif chatIdStage == "waitForReview":
+            reviewId = Dbw.getChatIdReviewId(chatId)
+            reviewStage = Dbw.getReviewIdStage(reviewId)
+            if reviewStage == "complete":
+                tBot.send_message(
+                    chatId, f"Билет с номером {reviewId} уже обработан и недоступен!")
+            elif reviewStage == "wait":
+                Dbw.setReviewIdChatId(reviewId, chatId)
+                Dbw.setReviewIdMessage(reviewId, text)
+                Dbw.setReviewIdStage(reviewId, "complete")
+
+                Dbw.setChatIdReviewId(chatId, "0")
+                Dbw.setChatIdStage(chatId, "idle")
+                tBot.send_message(
+                    chatId, f"Спасибо за ваш отзыв!")
     tBot.polling()
